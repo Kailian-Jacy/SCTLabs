@@ -4,8 +4,7 @@
 #include <iostream>
 #include <random>
 
-// const int kSize = 5000;
-const int kSize = 25;
+const int kSize = 5000;
 const int kKernelSize = 13; // odd
 
 #define InitRandom()                         \
@@ -106,27 +105,18 @@ void Output(const float *const a, const float *const w, const float *const b)
   }
 }
 
-__global__ void ConvGPU(float *ad, float *wd, float *bd, float *tmp)
+__global__ void ConvGPU(float *ad, float *wd, float *bd, float *tmp, int roundX, int roundY)
 {
-  /*
-    blockIdx.x = i
-    blockIdx.y = j
-    // ?~M?~C?确?~Z blockDim ?~Z~D?~P??~I?~@~B GridDim
-    blockDim.x = blockDim.y = kKernalSize
-    threadIdx.x = k
-    threadIdx.y = l
-  */
+
+  int RoundStartingIndex = 25 * roundY + 25 * roundX * kSize;
 
   float conv = 0;
   int x = blockIdx.x - kKernelSize / 2 + threadIdx.x;
   int y = blockIdx.y - kKernelSize / 2 + threadIdx.y;
-  // printf("x, y = (%d, %d)", x, y);
 
-  if (!(x < 0 || x >= kSize || y < 0 || y >= kSize))
+  if (!((x + 25 * roundX < 0) || (x + 25 * roundX >= kSize) || (y + 25 * roundY < 0) || (y + 25 * roundY >= kSize)))
   {
-    int adi = x * kSize + y;
-    int wdi = threadIdx.x * kKernelSize + threadIdx.y;
-    conv = ad[adi] * wd[wdi];
+    conv = ad[RoundStartingIndex + x * kSize + y] * wd[threadIdx.x * kKernelSize + threadIdx.y];
   }
 
   unsigned int tidInBlk = threadIdx.x * kKernelSize + threadIdx.y;
@@ -135,7 +125,7 @@ __global__ void ConvGPU(float *ad, float *wd, float *bd, float *tmp)
     return;
   }
 
-  float *idata = tmp + (blockIdx.x * kSize + blockIdx.y) * kKernelSize * kKernelSize;
+  float *idata = tmp + (blockIdx.x * 25 + blockIdx.y) * kKernelSize * kKernelSize;
   idata[tidInBlk] = conv;
   __syncthreads();
   if (tidInBlk == 0)
@@ -146,7 +136,7 @@ __global__ void ConvGPU(float *ad, float *wd, float *bd, float *tmp)
     }
   }
   __syncthreads();
-  bd[blockIdx.x * kSize + blockIdx.y] += idata[0];
+  bd[RoundStartingIndex + blockIdx.x * kSize + blockIdx.y] = idata[0];
 }
 
 int main()
@@ -162,36 +152,34 @@ int main()
 
   cudaEventRecord(start_e);
 
+  int tmpKsize = 25;
+
   // initialize data in device memory.
   float *ad = NULL, *tmp = NULL,
         *wd = NULL, *bd = NULL;
   cudaMalloc(&ad, kSize * kSize * sizeof(float));
   cudaMalloc(&wd, kKernelSize * kKernelSize * sizeof(float));
   cudaMalloc(&bd, kSize * kSize * sizeof(float));
-  cudaMalloc(&tmp, kSize * kSize * kKernelSize * kKernelSize * sizeof(float));
+  cudaMalloc(&tmp, tmpKsize * tmpKsize * kKernelSize * kKernelSize * sizeof(float));
 
   cudaDeviceSynchronize();
 
   cudaMemcpy(ad, a, kSize * kSize * sizeof(float), cudaMemcpyHostToDevice);
   cudaMemcpy(wd, w, kKernelSize * kKernelSize * sizeof(float), cudaMemcpyHostToDevice);
-  cudaMemcpy(bd, b, kSize * kSize * sizeof(float), cudaMemcpyHostToDevice);
-
-  /*
-    optimism strategy? transfer some of the data and start to run. when calculating
-    continue and finish the transferring.
-    [todo] test the time consumption and choose wether to optimize it.
-    [easy] there are few more functions for 2D or 3D malloc and transfusion.
-    [hard] it's hard to evaluate the disposal speed and transfer speed. 
-    [solution] make use of some synchronize methods? 
-  */
 
   cudaDeviceSynchronize();
 
   // the promoted GPU version.
-  dim3 grid(kSize, kSize, 1);
+  dim3 grid(tmpKsize, tmpKsize, 1);
   dim3 block(kKernelSize, kKernelSize, 1);
 
-  ConvGPU<<<grid, block>>>(ad, wd, bd, tmp);
+  for (int i = 0; i < kSize / tmpKsize; i++)
+  {
+    for (int j = 0; j < kSize / tmpKsize; j++)
+    {
+      ConvGPU<<<grid, block>>>(ad, wd, bd, tmp, i, j); // for efficiency concern, tmpKsize is hard-coded.
+    }
+  }
   cudaDeviceSynchronize();
 
   cudaMemcpy(b, bd, kSize * kSize * sizeof(float), cudaMemcpyDeviceToHost);
