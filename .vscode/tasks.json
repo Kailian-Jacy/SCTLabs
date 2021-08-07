@@ -1,0 +1,15 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "CUDA Make",
+			"type": "shell",
+			"command": "make gdb=1",
+			"group": {
+				"kind": "build",
+				"isDefault": true,
+			},
+			"problemMatcher": "$nvcc",
+		}
+	]
+}

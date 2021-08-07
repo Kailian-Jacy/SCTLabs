@@ -1,0 +1,11 @@
+{
+	"configurations": [
+		{
+			"name": "CUDA C++: Launch",
+			"type": "cuda-gdb",
+			"request": "launch",
+			"program": "/root/SCTLabs/conv",
+			"preLaunchTask": "CUDA Make"
+		}
+	]
+}
