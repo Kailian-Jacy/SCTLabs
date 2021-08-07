@@ -108,13 +108,13 @@ void Output(const float *const a, const float *const w, const float *const b)
 __global__ void ConvGPU(float *ad, float *wd, float *bd, float *tmp, int roundX, int roundY)
 {
 
-  int RoundStartingIndex = 25 * roundY + 25 * roundX * kSize;
+  int RoundStartingIndex = 50 * roundY + 50 * roundX * kSize;
 
   float conv = 0;
   int x = blockIdx.x - kKernelSize / 2 + threadIdx.x;
   int y = blockIdx.y - kKernelSize / 2 + threadIdx.y;
 
-  if (!((x + 25 * roundX < 0) || (x + 25 * roundX >= kSize) || (y + 25 * roundY < 0) || (y + 25 * roundY >= kSize)))
+  if (!((x + 50 * roundX < 0) || (x + 50 * roundX >= kSize) || (y + 50 * roundY < 0) || (y + 50 * roundY >= kSize)))
   {
     conv = ad[RoundStartingIndex + x * kSize + y] * wd[threadIdx.x * kKernelSize + threadIdx.y];
   }
@@ -125,7 +125,7 @@ __global__ void ConvGPU(float *ad, float *wd, float *bd, float *tmp, int roundX,
     return;
   }
 
-  float *idata = tmp + (blockIdx.x * 25 + blockIdx.y) * kKernelSize * kKernelSize;
+  float *idata = tmp + (blockIdx.x * 50 + blockIdx.y) * kKernelSize * kKernelSize;
   idata[tidInBlk] = conv;
   __syncthreads();
   if (tidInBlk == 0)
@@ -135,7 +135,6 @@ __global__ void ConvGPU(float *ad, float *wd, float *bd, float *tmp, int roundX,
       idata[0] += idata[i];
     }
   }
-  __syncthreads();
   bd[RoundStartingIndex + blockIdx.x * kSize + blockIdx.y] = idata[0];
 }
 
@@ -152,7 +151,7 @@ int main()
 
   cudaEventRecord(start_e);
 
-  int tmpKsize = 25;
+  int tmpKsize = 50;
 
   // initialize data in device memory.
   float *ad = NULL, *tmp = NULL,
@@ -184,6 +183,9 @@ int main()
 
   cudaMemcpy(b, bd, kSize * kSize * sizeof(float), cudaMemcpyDeviceToHost);
   cudaDeviceSynchronize();
+
+  cudaEventRecord(stop_e);
+  cudaEventSynchronize(stop_e);
 
   Check(a, w, b);
 

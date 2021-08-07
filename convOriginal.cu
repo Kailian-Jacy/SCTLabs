@@ -229,6 +229,9 @@ int main()
   cudaMemcpy(b, bd, kSize * kSize * sizeof(float), cudaMemcpyDeviceToHost);
   cudaDeviceSynchronize();
 
+  cudaEventRecord(stop_e);
+  cudaEventSynchronize(stop_e);
+
   Check(a, w, b);
 
   float milliseconds = 0;
