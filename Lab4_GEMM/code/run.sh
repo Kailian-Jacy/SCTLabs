@@ -1,3 +1,3 @@
-gcc hw_baseline.cpp -o gemm
+make
 
-./gemm
+make run
