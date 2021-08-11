@@ -1,6 +1,9 @@
 #include "hw.h"
 
 #define N __X_N
+#define L1Size 8
+#define L2Size 8
+#define Threads 64
 
 int matA[N * N], matB[N * N],
     matCm[N * N], matCm2[N * N];
@@ -51,7 +54,7 @@ void Orig()
     }
 }
 
-void Divide(int L1Size, int L2Size)
+void Divide()
 {
     // #pragma omp parallel for schedule(guided, 100)
     // for (int i = 0; i < N; ++i)
@@ -71,11 +74,17 @@ void Divide(int L1Size, int L2Size)
     //     }
     for (int k = 0; k < n; ++k)
     {
-#pragma omp parallel for
+        omp_set_dynamic(0);
+        // omp_set_num_threads(64);
+#pragma vector temporal
+#pragma ivdep
+#pragma omp parallel for num_threads(Threads)
         for (int i = 0; i < N * N; ++i)
             matA[i] += matB[i];
         int j = 0;
-#pragma omp parallel for
+#pragma vector temporal
+#pragma ivdep
+#pragma omp parallel for num_threads(Threads)
         for (j = 0; j < N - L2Size; j += L2Size)
         {
             int t = 0;
@@ -105,8 +114,10 @@ void Divide(int L1Size, int L2Size)
                     }
             }
         }
-#pragma omp parallel for
-        for (; j < N; j++)
+#pragma vector temporal
+#pragma ivdep
+#pragma omp parallel for num_threads(Threads)
+        for (int jj = j; jj < N; jj++)
         {
             int t = 0;
             for (t = 0; t < N - L1Size; t += L1Size)
@@ -116,10 +127,10 @@ void Divide(int L1Size, int L2Size)
                     int sum = 0;
                     for (int tt = 0; tt < L1Size; tt++)
                     {
-                        sum += matC[i * N + tt + t] * matA[j + N * (tt + t)];
-                        // sum += matC[i * N + tt + t] * matA[j + (tt + t) * N];
+                        sum += matC[i * N + tt + t] * matA[jj + N * (tt + t)];
+                        // sum += matC[i * N + tt + t] * matA[jj + (tt + t) * N];
                     }
-                    matC2[i * N + j] += sum;
+                    matC2[i * N + jj] += sum;
                 }
             }
             for (; t < N; t++)
@@ -127,9 +138,9 @@ void Divide(int L1Size, int L2Size)
                 for (int i = 0; i < N; ++i)
                 {
                     int sum = 0;
-                    sum += matC[i * N + t] * matA[j + t * N];
-                    matC2[i * N + j] += sum;
-                    // matC2[i * N + j] += matC[i * N + t] * matA[j + t * N];
+                    sum += matC[i * N + t] * matA[jj + t * N];
+                    matC2[i * N + jj] += sum;
+                    // matC2[i * N + jj] += matC[i * N + t] * matA[jj + t * N];
                 }
             }
         }
@@ -161,6 +172,6 @@ int main()
     memcpy(matC, matA, sizeof(int[N * N]));
 
     // Orig();
-    Divide(8, 512);
+    Divide();
     output(matC, n);
 }

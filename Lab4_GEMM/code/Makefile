@@ -4,7 +4,7 @@ CFLAGS=-mcmodel=medium
 # add `-mcmodel=medium` in this case.
 
 all:
-	$(CC) -o gemm hw_baseline.cpp $(CFLAGS) -g -O3
+	$(CC) -o gemm hw_baseline.cpp $(CFLAGS) -g -O3 -fopenmp
 
 .PHONY: run
 run: all
