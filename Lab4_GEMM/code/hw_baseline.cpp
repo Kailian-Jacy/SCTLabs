@@ -51,9 +51,9 @@ void Orig()
     }
 }
 
-void Divide(int cacheSize)
+void Divide(int L1Size, int L2Size)
 {
-    //#pragma omp parallel for schedule(guided, 100)
+    // #pragma omp parallel for schedule(guided, 100)
     // for (int i = 0; i < N; ++i)
     //     for (int j = 0; j < i; ++j)
     //     {
@@ -61,7 +61,7 @@ void Divide(int cacheSize)
     //         matA[i * N + j] = matA[j * N + i];
     //         matA[j * N + i] = t;
     //     }
-    // // //#pragma omp parallel for schedule(guided, 100)
+    // //#pragma omp parallel for schedule(guided, 100)
     // for (int i = 0; i < N; ++i)
     //     for (int j = 0; j < i; ++j)
     //     {
@@ -74,28 +74,64 @@ void Divide(int cacheSize)
 #pragma omp parallel for
         for (int i = 0; i < N * N; ++i)
             matA[i] += matB[i];
+        int j = 0;
 #pragma omp parallel for
-        int t = 0;
-        for (t = 0; t < N - cacheSize; t += cacheSize)
+        for (j = 0; j < N - L2Size; j += L2Size)
         {
-            for (int i = 0; i < N; ++i)
-                for (int j = 0; j < N; ++j)
+            int t = 0;
+            for (t = 0; t < N - L1Size; t += L1Size)
+            {
+                for (int i = 0; i < N; ++i)
+                    for (int jj = 0; jj < L2Size; jj++)
+                    {
+                        int sum = 0;
+                        for (int tt = 0; tt < L1Size; tt++)
+                        {
+                            // sum += matC[i * N + tt + t] * matA[jj * N + (tt + t)];
+                            sum += matC[i * N + tt + t] * matA[jj + j + (tt + t) * N];
+                        }
+                        matC2[i * N + jj + j] += sum;
+                    }
+            }
+            for (; t < N; t++)
+            {
+                for (int i = 0; i < N; ++i)
+                    for (int jj = 0; jj < L2Size; jj++)
+                    {
+                        // matC2[i * N + jj] += matC[i * N + t] * matA[jj * N + t];
+                        int sum = 0;
+                        sum += matC[i * N + t] * matA[jj + j + t * N];
+                        matC2[i * N + jj + j] += sum;
+                    }
+            }
+        }
+#pragma omp parallel for
+        for (; j < N; j++)
+        {
+            int t = 0;
+            for (t = 0; t < N - L1Size; t += L1Size)
+            {
+                for (int i = 0; i < N; ++i)
                 {
                     int sum = 0;
-                    for (int tt = 0; tt < cacheSize; tt++)
-                        // sum += matC[i * N + tt + t] * matA[j * N + (tt + t)];
-                        sum += matC[i * N + tt + t] * matA[j + (tt + t) * N];
+                    for (int tt = 0; tt < L1Size; tt++)
+                    {
+                        sum += matC[i * N + tt + t] * matA[j + N * (tt + t)];
+                        // sum += matC[i * N + tt + t] * matA[j + (tt + t) * N];
+                    }
                     matC2[i * N + j] += sum;
                 }
-        }
-        for (; t < N; t++)
-        {
-            for (int i = 0; i < N; ++i)
-                for (int j = 0; j < N; ++j)
+            }
+            for (; t < N; t++)
+            {
+                for (int i = 0; i < N; ++i)
                 {
-                    // matC2[i * N + j] += matC[i * N + t] * matA[j * N + t];
-                    matC2[i * N + j] += matC[i * N + t] * matA[j + t * N];
+                    int sum = 0;
+                    sum += matC[i * N + t] * matA[j + t * N];
+                    matC2[i * N + j] += sum;
+                    // matC2[i * N + j] += matC[i * N + t] * matA[j + t * N];
                 }
+            }
         }
         int *tmp = matC;
         matC = matC2;
@@ -125,6 +161,6 @@ int main()
     memcpy(matC, matA, sizeof(int[N * N]));
 
     // Orig();
-    Divide(8);
+    Divide(8, 512);
     output(matC, n);
 }

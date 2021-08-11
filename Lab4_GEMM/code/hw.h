@@ -6,7 +6,7 @@
 #include <ctime>
 #include <memory.h>
 
-#define __X_N 10001
+#define __X_N 1024
 int __X_matA[__X_N * __X_N], __X_matB[__X_N * __X_N],
     __X_tv_m[__X_N], __X_tv_m2[__X_N];
 struct timespec __X_begin, __X_end;
