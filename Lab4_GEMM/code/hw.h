@@ -6,7 +6,7 @@
 #include <ctime>
 #include <memory.h>
 
-#define __X_N 1024
+#define __X_N 10001
 int __X_matA[__X_N * __X_N], __X_matB[__X_N * __X_N],
     __X_tv_m[__X_N], __X_tv_m2[__X_N];
 struct timespec __X_begin, __X_end;
@@ -22,17 +22,17 @@ void input(int *matA, int *matB)
     pid = 0;
 
     srand(time(NULL));
-#pragma omp parallel for
+#pragma omp parallel for num_threads(4)
     for (int i = 0; i < __X_N * __X_N; ++i)
         __X_matA[i] = rand();
-#pragma omp parallel for
+#pragma omp parallel for num_threads(4)
     for (int i = 0; i < __X_N * __X_N; ++i)
         __X_matB[i] = rand();
-#pragma omp parallel for
+#pragma omp parallel for num_threads(4)
     for (int i = 0; i < __X_N; ++i)
         for (int j = 0; j < __X_N; ++j)
             matA[i * __X_N + j] = __X_matA[j * __X_N + i];
-#pragma omp parallel for
+#pragma omp parallel for num_threads(4)
     for (int i = 0; i < __X_N; ++i)
         for (int j = 0; j < __X_N; ++j)
             matB[i * __X_N + j] = __X_matB[j * __X_N + i];
@@ -50,10 +50,10 @@ void output(int *result, int n)
         __X_tv[i] = __X_matA[i * __X_N + test_on];
     for (int k = 0; k < n; ++k)
     {
-#pragma omp parallel for
+#pragma omp parallel for num_threads(4)
         for (int i = 0; i < __X_N * __X_N; ++i)
             __X_matA[i] += __X_matB[i];
-#pragma omp parallel for
+#pragma omp parallel for num_threads(4)
         for (int i = 0; i < __X_N; ++i)
         {
             int sum = 0, row = i * __X_N;

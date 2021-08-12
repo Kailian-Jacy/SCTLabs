@@ -5,10 +5,14 @@
             "label": "C/C++: g++ build active file",
             "command": "/usr/bin/g++",
             "args": [
-                "-g",
+                "-fopenmp",
                 "${file}",
                 "-o",
-                "${fileDirname}/gemm"
+                "${fileDirname}/gemm",
+                "-O3",
+                "-l",
+                "pthread",
+                "-mcmodel=medium"
             ],
             "options": {
                 "cwd": "${fileDirname}"

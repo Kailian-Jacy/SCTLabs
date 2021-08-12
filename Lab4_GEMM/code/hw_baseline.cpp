@@ -2,19 +2,13 @@
 
 #define N __X_N
 #define L1Size 8
-#define L2Size 8
+// #define L2Size 8
 #define Threads 64
 
 int matA[N * N], matB[N * N],
     matCm[N * N], matCm2[N * N];
 
 int *matC, *matC2, n;
-
-/*
-    这是经过验证版本的最初基准函数。
-    可以发现，取消转置之后，运行速度就降到了 200Mops (N=1024数据量) 
-    原先转置的时候是 400 左右。
-*/
 
 void Orig()
 {
@@ -56,42 +50,28 @@ void Orig()
 
 void Divide()
 {
-    // #pragma omp parallel for schedule(guided, 100)
-    // for (int i = 0; i < N; ++i)
-    //     for (int j = 0; j < i; ++j)
-    //     {
-    //         int t = matA[i * N + j];
-    //         matA[i * N + j] = matA[j * N + i];
-    //         matA[j * N + i] = t;
-    //     }
-    // //#pragma omp parallel for schedule(guided, 100)
-    // for (int i = 0; i < N; ++i)
-    //     for (int j = 0; j < i; ++j)
-    //     {
-    //         int t = matB[i * N + j];
-    //         matB[i * N + j] = matB[j * N + i];
-    //         matB[j * N + i] = t;
-    //     }
     for (int k = 0; k < n; ++k)
     {
-        omp_set_dynamic(0);
         // omp_set_num_threads(64);
-#pragma vector temporal
-#pragma ivdep
+        printf("starting adding.\n");
+#pragma vector temporal ivdep
+#pragma GOMP_CPU_AFFINITY = "0-4"
 #pragma omp parallel for num_threads(Threads)
         for (int i = 0; i < N * N; ++i)
             matA[i] += matB[i];
-        int j = 0;
-#pragma vector temporal
-#pragma ivdep
+        printf("starting calculating.\n");
+        int threadSize = N / Threads;
+#pragma vector temporal ivdep
+#pragma GOMP_CPU_AFFINITY = "0-4"
 #pragma omp parallel for num_threads(Threads)
-        for (j = 0; j < N - L2Size; j += L2Size)
+        for (int j = omp_get_num_threads() * threadSize; j < N; j += threadSize)
         {
+            // printf("%d\n", j);
             int t = 0;
             for (t = 0; t < N - L1Size; t += L1Size)
             {
                 for (int i = 0; i < N; ++i)
-                    for (int jj = 0; jj < L2Size; jj++)
+                    for (int jj = 0; jj < threadSize; jj++)
                     {
                         int sum = 0;
                         for (int tt = 0; tt < L1Size; tt++)
@@ -105,7 +85,7 @@ void Divide()
             for (; t < N; t++)
             {
                 for (int i = 0; i < N; ++i)
-                    for (int jj = 0; jj < L2Size; jj++)
+                    for (int jj = 0; jj < Threads; jj++)
                     {
                         // matC2[i * N + jj] += matC[i * N + t] * matA[jj * N + t];
                         int sum = 0;
@@ -114,10 +94,10 @@ void Divide()
                     }
             }
         }
-#pragma vector temporal
-#pragma ivdep
+#pragma vector temporal ivdep
+#pragma GOMP_CPU_AFFINITY = "0-4"
 #pragma omp parallel for num_threads(Threads)
-        for (int jj = j; jj < N; jj++)
+        for (int jj = N - N % Threads; jj < N; jj++)
         {
             int t = 0;
             for (t = 0; t < N - L1Size; t += L1Size)
@@ -152,23 +132,12 @@ void Divide()
 
 int main()
 {
-    // int rate[] = {10,  // 345.036
-    //               20,  // 324
-    //               40,  // 335
-    //               50,
-    //               60,  // 349
-    //               70,
-    //               90,
-    //               100,
-    //               110,
-    //               150,
-    //               200,
-    //               250,
-    //               400};
+    printf("starting..\n");
     input(matA, matB);
     matC = matCm;
     matC2 = matCm2;
     n = 1;
+    printf("starting Memcpy");
     memcpy(matC, matA, sizeof(int[N * N]));
 
     // Orig();
