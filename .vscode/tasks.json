@@ -3,16 +3,15 @@
         {
             "type": "cppbuild",
             "label": "C/C++: g++ build active file",
-            "command": "/usr/bin/g++",
+            "command": "/usr/bin/gcc",
             "args": [
                 "-fopenmp",
                 "${file}",
                 "-o",
                 "${fileDirname}/gemm",
                 "-O3",
-                "-l",
-                "pthread",
-                "-mcmodel=medium"
+                "-mcmodel=medium",
+                "-m"
             ],
             "options": {
                 "cwd": "${fileDirname}"

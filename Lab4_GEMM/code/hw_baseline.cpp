@@ -3,7 +3,7 @@
 #define N __X_N
 #define L1Size 8
 // #define L2Size 8
-#define Threads 64
+#define Threads 4
 
 int matA[N * N], matB[N * N],
     matCm[N * N], matCm2[N * N];
@@ -53,20 +53,19 @@ void Divide()
     for (int k = 0; k < n; ++k)
     {
         // omp_set_num_threads(64);
-        printf("starting adding.\n");
+        // printf("starting adding.\n");
 #pragma vector temporal ivdep
 #pragma GOMP_CPU_AFFINITY = "0-4"
 #pragma omp parallel for num_threads(Threads)
         for (int i = 0; i < N * N; ++i)
             matA[i] += matB[i];
-        printf("starting calculating.\n");
+        // printf("starting calculating.\n");
         int threadSize = N / Threads;
 #pragma vector temporal ivdep
 #pragma GOMP_CPU_AFFINITY = "0-4"
 #pragma omp parallel for num_threads(Threads)
-        for (int j = omp_get_num_threads() * threadSize; j < N; j += threadSize)
+        for (int j = 0; j < N - threadSize; j += threadSize)
         {
-            // printf("%d\n", j);
             int t = 0;
             for (t = 0; t < N - L1Size; t += L1Size)
             {
@@ -85,7 +84,7 @@ void Divide()
             for (; t < N; t++)
             {
                 for (int i = 0; i < N; ++i)
-                    for (int jj = 0; jj < Threads; jj++)
+                    for (int jj = 0; jj < threadSize; jj++)
                     {
                         // matC2[i * N + jj] += matC[i * N + t] * matA[jj * N + t];
                         int sum = 0;
@@ -97,7 +96,7 @@ void Divide()
 #pragma vector temporal ivdep
 #pragma GOMP_CPU_AFFINITY = "0-4"
 #pragma omp parallel for num_threads(Threads)
-        for (int jj = N - N % Threads; jj < N; jj++)
+        for (int jj = N - (N - 1) % threadSize - 1; jj < N; jj++)
         {
             int t = 0;
             for (t = 0; t < N - L1Size; t += L1Size)
@@ -132,12 +131,12 @@ void Divide()
 
 int main()
 {
-    printf("starting..\n");
+    // printf("starting..\n");
     input(matA, matB);
     matC = matCm;
     matC2 = matCm2;
     n = 1;
-    printf("starting Memcpy");
+    // printf("starting Memcpy");
     memcpy(matC, matA, sizeof(int[N * N]));
 
     // Orig();

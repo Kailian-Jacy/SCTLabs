@@ -4,7 +4,7 @@ CFLAGS=-mcmodel=medium
 # add `-mcmodel=medium` in this case.
 
 all:
-	$(CC) -o gemm hw_baseline.cpp $(CFLAGS) -O3 -fopenmp -g
+	$(CC) -o gemm hw_baseline.cpp $(CFLAGS) -O3 -fopenmp -g -march=skylake-avx512
 
 .PHONY: run
 run: all
