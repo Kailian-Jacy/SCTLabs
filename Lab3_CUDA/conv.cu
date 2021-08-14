@@ -2,6 +2,7 @@
 
 #include <iomanip>
 #include <iostream>
+#include <stdio.h>
 #include <random>
 
 const int kSize = 5000;
@@ -105,7 +106,7 @@ void Output(const float *const a, const float *const w, const float *const b)
   }
 }
 
-__global__ void ConvGPU(const float *const ad, const float *const wd, float *bd, float *tmp, int const roundX, int const roundY)
+__global__ void ConvGPU(const float *const ad, const float *const wd, float *bd, int const roundX, int const roundY)
 {
 
   int RoundStartingIndex = 50 * roundY + 50 * roundX * 5000;
@@ -125,16 +126,30 @@ __global__ void ConvGPU(const float *const ad, const float *const wd, float *bd,
     return;
   }
 
-  float *idata = tmp + (blockIdx.x * 50 + blockIdx.y) * 13 * 13;
+  // float *idata = tmp + (blockIdx.x * 50 + blockIdx.y) * 13 * 13;
+  __shared__ float idata[13 * 13];
   idata[tidInBlk] = conv;
   __syncthreads();
-  if (tidInBlk == 0)
+
+  if (tidInBlk % 28 == 0 && tidInBlk != 168)
   {
-    for (int i = 1; i < 13 * 13; i++)
+    for (int i = 1; i < 32; i++)
     {
-      idata[0] += idata[i];
+      idata[tidInBlk] += idata[tidInBlk + i];
     }
   }
+  __syncthreads();
+
+  printf("reduced..1\n");
+  if (tidInBlk == 0)
+  {
+    for (int i = 1; i < 7; i++)
+    {
+      idata[0] += idata[i * 28];
+    }
+  }
+  printf("reduced..\n");
+
   bd[RoundStartingIndex + blockIdx.x * 5000 + blockIdx.y] = idata[0];
 }
 
@@ -154,12 +169,11 @@ int main()
   int tmpKsize = 50;
 
   // initialize data in device memory.
-  float *ad = NULL, *tmp = NULL,
+  float *ad = NULL,
         *wd = NULL, *bd = NULL;
   cudaMalloc(&ad, kSize * kSize * sizeof(float));
   cudaMalloc(&wd, kKernelSize * kKernelSize * sizeof(float));
   cudaMalloc(&bd, kSize * kSize * sizeof(float));
-  cudaMalloc(&tmp, tmpKsize * tmpKsize * kKernelSize * kKernelSize * sizeof(float));
 
   cudaDeviceSynchronize();
 
@@ -172,14 +186,16 @@ int main()
   dim3 grid(tmpKsize, tmpKsize, 1);
   dim3 block(kKernelSize, kKernelSize, 1);
 
+  printf("Starting..\n");
   for (int i = 0; i < kSize / tmpKsize; i++)
   {
     for (int j = 0; j < kSize / tmpKsize; j++)
     {
-      ConvGPU<<<grid, block>>>(ad, wd, bd, tmp, i, j); // for efficiency concern, tmpKsize is hard-coded.
+      ConvGPU<<<grid, block>>>(ad, wd, bd, i, j); // for efficiency concern, tmpKsize is hard-coded.
     }
   }
   cudaDeviceSynchronize();
+  printf("Ended..\n");
 
   cudaMemcpy(b, bd, kSize * kSize * sizeof(float), cudaMemcpyDeviceToHost);
   cudaDeviceSynchronize();
