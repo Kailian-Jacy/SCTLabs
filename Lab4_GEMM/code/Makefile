@@ -1,4 +1,4 @@
-CC=gcc
+CC=mpicc
 CFLAGS=-mcmodel=medium
 # compiler may crash when static array too large,
 # add `-mcmodel=medium` in this case.
